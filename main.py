@@ -2,7 +2,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 # ТВОЙ ТОКЕН
-BOT_TOKEN = "8572689919:AAK_da3E1Q5GGR7eX0npANrq4c6uHCHL58"
+BOT_TOKEN = "8572689919:AAHYMpKOdp2ejZpq7n64mKOIIjDa2xTn-80"
 
 # ТВОЙ USER ID
 ALLOWED_USER_ID = 1346576926
