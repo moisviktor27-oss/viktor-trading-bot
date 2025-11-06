@@ -203,10 +203,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(message, reply_markup=reply_markup)
 
+# Функция для команды /ping
+async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ALLOWED_USER_ID:
+        return
+    current_time = datetime.now().strftime("%H:%M:%S")
+    await update.message.reply_text(f"🟢 Бот жив! Время: {current_time}")
+    
 # Запуск бота
 if __name__ == "__main__":
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("ping", ping))
     app.add_handler(CommandHandler("add", add_coin))
     app.add_handler(CommandHandler("remove", remove_coin))
     app.add_handler(CommandHandler("coins", list_coins))
