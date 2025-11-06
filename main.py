@@ -1,5 +1,5 @@
-from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from datetime import datetime
 
 # ТВОЙ ТОКЕН
@@ -106,6 +106,75 @@ async def list_coins(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = f"📌 Мои монеты\n\nСейчас отслеживаю {len(bot_data['coins'])} монет:\n{coins_list}\n\n➕ Добавить новую монету: /add KAS"
     await update.message.reply_text(message)
 
+# Функция для кнопки "Настройки"
+async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ALLOWED_USER_ID:
+        return
+
+    keyboard = [
+        [InlineKeyboardButton(f"🔄 Режим: {bot_data['mode']}", callback_data="change_mode")],
+        [InlineKeyboardButton(f"⏸️ Статус: {bot_data['status']}", callback_data="toggle_pause")],
+        [InlineKeyboardButton(f"📊 Лимит: {bot_data['signals_max']}", callback_data="change_limit")],
+        [InlineKeyboardButton("❌ Закрыть", callback_data="close_settings")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    message = (
+        f"⚙️ Настройки\n\n"
+        f"🔹 Режим анализа: {bot_data['mode']}\n"
+        f"🔹 Статус: {bot_data['status']}\n"
+        f"🔹 Сигналов в день: {bot_data['signals_max']}"
+    )
+    await update.message.reply_text(message, reply_markup=reply_markup)
+
+# Обработчик нажатий на кнопки
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "change_mode":
+        # Кнопки для выбора режима
+        keyboard = [
+            [InlineKeyboardButton("Auto", callback_data="mode_Auto")],
+            [InlineKeyboardButton("Swing", callback_data="mode_Swing")],
+            [InlineKeyboardButton("Breakout", callback_data="mode_Breakout")],
+            [InlineKeyboardButton("RSI", callback_data="mode_RSI")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text("🔄 Выбери режим анализа:", reply_markup=reply_markup)
+
+    elif query.data.startswith("mode_"):
+        mode = query.data.split("_")[1]
+        bot_data['mode'] = mode
+        await query.edit_message_text(f"✅ Режим изменён: {mode}")
+
+    elif query.data == "toggle_pause":
+        if bot_data['status'] == "РАБОТАЕТ":
+            bot_data['status'] = "ПАУЗА"
+            status_text = "⏸️ Бот поставлен на паузу"
+        else:
+            bot_data['status'] = "РАБОТАЕТ"
+            status_text = "▶️ Бот возобновил работу"
+        await query.edit_message_text(status_text)
+
+    elif query.data == "change_limit":
+        # Кнопки для выбора лимита
+        keyboard = [
+            [InlineKeyboardButton("10", callback_data="limit_10")],
+            [InlineKeyboardButton("15", callback_data="limit_15")],
+            [InlineKeyboardButton("20", callback_data="limit_20")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text("📊 Выбери лимит сигналов в день:", reply_markup=reply_markup)
+
+    elif query.data.startswith("limit_"):
+        limit = int(query.data.split("_")[1])
+        bot_data['signals_max'] = limit
+        await query.edit_message_text(f"✅ Лимит изменён: {limit}")
+
+    elif query.data == "close_settings":
+        await query.edit_message_text("⚙️ Настройки закрыты")
+
 # Функция для кнопки "Мои монеты"
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ALLOWED_USER_ID:
@@ -117,6 +186,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         coins_list = "\n".join([f"• {coin} ✅" for coin in bot_data['coins']])
         message = f"📌 Мои монеты\n\nСейчас отслеживаю {len(bot_data['coins'])} монет:\n{coins_list}\n\n➕ Добавить новую монету: /add KAS"
         await update.message.reply_text(message)
+    elif text == "⚙️ Настройки":
+        keyboard = [
+            [InlineKeyboardButton(f"🔄 Режим: {bot_data['mode']}", callback_data="change_mode")],
+            [InlineKeyboardButton(f"⏸️ Статус: {bot_data['status']}", callback_data="toggle_pause")],
+            [InlineKeyboardButton(f"📊 Лимит: {bot_data['signals_max']}", callback_data="change_limit")],
+            [InlineKeyboardButton("❌ Закрыть", callback_data="close_settings")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        message = (
+            f"⚙️ Настройки\n\n"
+            f"🔹 Режим анализа: {bot_data['mode']}\n"
+            f"🔹 Статус: {bot_data['status']}\n"
+            f"🔹 Сигналов в день: {bot_data['signals_max']}"
+        )
+        await update.message.reply_text(message, reply_markup=reply_markup)
 
 # Запуск бота
 if __name__ == "__main__":
@@ -125,5 +210,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("add", add_coin))
     app.add_handler(CommandHandler("remove", remove_coin))
     app.add_handler(CommandHandler("coins", list_coins))
+    app.add_handler(CommandHandler("settings", settings_menu))
+    app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.run_polling()
