@@ -1,5 +1,5 @@
 from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 from datetime import datetime
 
 # ТВОЙ ТОКЕН
@@ -61,8 +61,69 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(message, reply_markup=reply_markup)
 
+# Функция для команды /add
+async def add_coin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ALLOWED_USER_ID:
+        return
+
+    if not context.args:
+        await update.message.reply_text("❌ Укажи монету: /add KAS")
+        return
+
+    coin = context.args[0].upper()
+
+    if coin in bot_data['coins']:
+        await update.message.reply_text(f"✅ Монета {coin} уже в списке")
+        return
+
+    bot_data['coins'].append(coin)
+    await update.message.reply_text(f"✅ Добавлена монета: {coin}")
+
+# Функция для команды /remove
+async def remove_coin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ALLOWED_USER_ID:
+        return
+
+    if not context.args:
+        await update.message.reply_text("❌ Укажи монету: /remove KAS")
+        return
+
+    coin = context.args[0].upper()
+
+    if coin not in bot_data['coins']:
+        await update.message.reply_text(f"❌ Монета {coin} не найдена в списке")
+        return
+
+    bot_data['coins'].remove(coin)
+    await update.message.reply_text(f"✅ Удалена монета: {coin}")
+
+# Функция для команды /coins
+async def list_coins(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ALLOWED_USER_ID:
+        return
+
+    coins_list = "\n".join([f"• {coin} ✅" for coin in bot_data['coins']])
+    message = f"📌 Мои монеты\n\nСейчас отслеживаю {len(bot_data['coins'])} монет:\n{coins_list}\n\n➕ Добавить новую монету: /add KAS"
+    await update.message.reply_text(message)
+
+# Функция для кнопки "Мои монеты"
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ALLOWED_USER_ID:
+        return
+
+    text = update.message.text
+
+    if text == "📌 Мои монеты":
+        coins_list = "\n".join([f"• {coin} ✅" for coin in bot_data['coins']])
+        message = f"📌 Мои монеты\n\nСейчас отслеживаю {len(bot_data['coins'])} монет:\n{coins_list}\n\n➕ Добавить новую монету: /add KAS"
+        await update.message.reply_text(message)
+
 # Запуск бота
 if __name__ == "__main__":
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("add", add_coin))
+    app.add_handler(CommandHandler("remove", remove_coin))
+    app.add_handler(CommandHandler("coins", list_coins))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.run_polling()
