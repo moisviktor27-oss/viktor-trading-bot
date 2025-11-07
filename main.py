@@ -38,12 +38,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Формируем сообщение
     message = (
-        f"📊 BYBIT Dashboard | {update.effective_user.first_name}\n\n"
+        f"💰️💰️ BYBIT Dashboard | {update.effective_user.first_name}\n\n"
         f"⏰ {today} | 🧪 ТЕСТ\n"
         f"🟢 Статус: {bot_data['status']} (сканирует каждые 30 сек)\n"
         f"🔄 В работе: 0 сделок\n"
         f"🌐 BTC: 📈 +0.5% | Доминирование: 51%\n\n"
-        f"💰 Баланс: ${bot_data['balance_start']:.2f} → ${bot_data['balance_current']:.2f} ({bot_data['profit_pct']:+.1f}%)\n"
+        f"💲💲 Баланс: ${bot_data['balance_start']:.2f} → ${bot_data['balance_current']:.2f} ({bot_data['profit_pct']:+.1f}%)\n"
         f"🎯 Сигналов сегодня: {bot_data['signals_today']} из {bot_data['signals_max']}\n\n"
         f"📈 Прогресс дня:\n"
         f"| Профит  | {make_bar(bot_data['profit_pct'])} ({bot_data['profit_pct']:.0f}%) |\n"
