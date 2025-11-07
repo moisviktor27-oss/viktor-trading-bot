@@ -68,12 +68,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Формируем сообщение
     message = (
-        f"📊 BYBIT Dashboard | {update.effective_user.first_name}\n\n"
+        f"💰💰 BYBIT Dashboard | {update.effective_user.first_name}\n\n"
         f"⏰ {today} | 🧪 ТЕСТ\n"
         f"🟢 Статус: {bot_data['settings']['status']} (сканирует каждые 30 сек)\n"
         f"🔄 В работе: 0 сделок\n"
         f"🌐 BTC: 📈 +0.5% | Доминирование: 51%\n\n"
-        f"💰 Баланс: ${bot_data['balance']['start']:.2f} → ${bot_data['balance']['current']:.2f} ({bot_data['stats']['profit_total']:+.1f}%)\n"
+        f"💲💲 Баланс: ${bot_data['balance']['start']:.2f} → ${bot_data['balance']['current']:.2f} ({bot_data['stats']['profit_total']:+.1f}%)\n"
         f"🎯 Сигналов сегодня: {bot_data['stats']['signals_today']} из {bot_data['settings']['signals_max']}\n\n"
         f"📈 Прогресс дня:\n"
         f"| Профит  | {make_bar(bot_data['stats']['profit_total'])} ({bot_data['stats']['profit_total']:.0f}%) |\n"
@@ -164,7 +164,7 @@ async def add_coin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     bot_data['coins'].append(coin)
-    save_data(bot_data)  # ✅ СОХРАНИТЬ ДАННЫЕ
+    save_data(bot_data)
     await update.message.reply_text(f"✅ Добавлена монета: {coin}")
 
 # Функция для команды /remove
@@ -183,7 +183,7 @@ async def remove_coin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     bot_data['coins'].remove(coin)
-    save_data(bot_data)  # ✅ СОХРАНИТЬ ДАННЫЕ
+    save_data(bot_data)
     await update.message.reply_text(f"✅ Удалена монета: {coin}")
 
 # Функция для команды /coins
@@ -216,13 +216,13 @@ async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(message, reply_markup=reply_markup)
 
-# Обработчик нажатий на кнопки
+# ОБЪЕДИНЕННЫЙ обработчик нажатий на кнопки
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
+    # Обработка настроек
     if query.data == "change_mode":
-        # Кнопки для выбора режима
         keyboard = [
             [InlineKeyboardButton("Auto", callback_data="mode_Auto")],
             [InlineKeyboardButton("Swing", callback_data="mode_Swing")],
@@ -235,7 +235,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data.startswith("mode_"):
         mode = query.data.split("_")[1]
         bot_data['settings']['mode'] = mode
-        save_data(bot_data)  # ✅ СОХРАНИТЬ ДАННЫЕ
+        save_data(bot_data)
         await query.edit_message_text(f"✅ Режим изменён: {mode}")
 
     elif query.data == "toggle_pause":
@@ -245,11 +245,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             bot_data['settings']['status'] = "РАБОТАЕТ"
             status_text = "▶️ Бот возобновил работу"
-        save_data(bot_data)  # ✅ СОХРАНИТЬ ДАННЫЕ
+        save_data(bot_data)
         await query.edit_message_text(status_text)
 
     elif query.data == "change_limit":
-        # Кнопки для выбора лимита
         keyboard = [
             [InlineKeyboardButton("10", callback_data="limit_10")],
             [InlineKeyboardButton("15", callback_data="limit_15")],
@@ -261,7 +260,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data.startswith("limit_"):
         limit = int(query.data.split("_")[1])
         bot_data['settings']['signals_max'] = limit
-        save_data(bot_data)  # ✅ СОХРАНИТЬ ДАННЫЕ
+        save_data(bot_data)
         await query.edit_message_text(f"✅ Лимит изменён: {limit}")
 
     elif query.data == "close_settings":
@@ -276,18 +275,41 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("➖ Введите монету для удаления (например: KAS)")
         context.user_data['awaiting_remove'] = True
 
-# Функция для кнопки "Мои монеты"
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ОБЪЕДИНЕННЫЙ обработчик текстовых сообщений
+async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ALLOWED_USER_ID:
         return
 
     text = update.message.text
+    
+    # Проверяем, ожидаем ли мы ввод монеты для добавления/удаления
+    if context.user_data.get('awaiting_add'):
+        coin = text.upper()
+        if coin in bot_data['coins']:
+            await update.message.reply_text(f"✅ Монета {coin} уже в списке")
+        else:
+            bot_data['coins'].append(coin)
+            save_data(bot_data)
+            await update.message.reply_text(f"✅ Добавлена монета: {coin}")
+        context.user_data.pop('awaiting_add', None)
+        return
+        
+    elif context.user_data.get('awaiting_remove'):
+        coin = text.upper()
+        if coin not in bot_data['coins']:
+            await update.message.reply_text(f"❌ Монета {coin} не найдена в списке")
+        else:
+            bot_data['coins'].remove(coin)
+            save_data(bot_data)
+            await update.message.reply_text(f"✅ Удалена монета: {coin}")
+        context.user_data.pop('awaiting_remove', None)
+        return
 
+    # Обработка кнопок главного меню
     if text == "📌 Мои монеты":
         coins_list = "\n".join([f"• {coin} ✅" for coin in bot_data['coins']])
         message = f"📌 Мои монеты\n\nСейчас отслеживаю {len(bot_data['coins'])} монет:\n{coins_list}\n\n➕ Добавить новую монету: /add KAS"
         
-        # Кнопки
         keyboard = [
             [InlineKeyboardButton("➕ Добавить", callback_data="add_coin")],
             [InlineKeyboardButton("➖ Удалить", callback_data="remove_coin")]
@@ -297,21 +319,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(message, reply_markup=reply_markup)
         
     elif text == "🔄 Обновить статус":
-        # Получаем ID старого сообщения
         old_message_id = context.user_data.get('dashboard_message_id')
 
-        # Обновляем данные
         now = datetime.now()
         today = now.strftime("%-d %B %Y, %H:%M:%S")
 
-        # Формируем сообщение
         message = (
-            f"📊 BYBIT Dashboard | {update.effective_user.first_name}\n\n"
+            f"💰💰 BYBIT Dashboard | {update.effective_user.first_name}\n\n"
             f"⏰ {today} | 🧪 ТЕСТ\n"
             f"🟢 Статус: {bot_data['settings']['status']} (сканирует каждые 30 сек)\n"
             f"🔄 В работе: 0 сделок\n"
             f"🌐 BTC: 📈 +0.5% | Доминирование: 51%\n\n"
-            f"💰 Баланс: ${bot_data['balance']['start']:.2f} → ${bot_data['balance']['current']:.2f} ({bot_data['stats']['profit_total']:+.1f}%)\n"
+            f"💲💲 Баланс: ${bot_data['balance']['start']:.2f} → ${bot_data['balance']['current']:.2f} ({bot_data['stats']['profit_total']:+.1f}%)\n"
             f"🎯 Сигналов сегодня: {bot_data['stats']['signals_today']} из {bot_data['settings']['signals_max']}\n\n"
             f"📈 Прогресс дня:\n"
             f"| Профит  | {make_bar(bot_data['stats']['profit_total'])} ({bot_data['stats']['profit_total']:.0f}%) |\n"
@@ -319,7 +338,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"| Риск    | {make_bar(bot_data['stats']['max_drawdown'])} ({bot_data['stats']['max_drawdown']:.0f}%) |\n\n"
         )
 
-        # Кнопки
         keyboard = [
             ["📊 Сигналы за сегодня", "📈 Статистика теста"],
             ["⚙️ Настройки", "📌 Мои монеты"],
@@ -327,31 +345,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-        # Отправляем новое сообщение
         new_message = await update.message.reply_text(message, reply_markup=reply_markup)
-        
-        # Сохраняем ID нового сообщения
         context.user_data['dashboard_message_id'] = new_message.message_id
         
-        # Удаляем старое сообщение (с дашбордом)
         if old_message_id:
             try:
                 await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=old_message_id)
             except:
-                pass  # Игнорируем ошибку, если сообщение не найдено
+                pass
 
-        # Удаляем сообщение, откуда была нажата кнопка
         try:
             await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=update.message.message_id)
         except:
-            pass  # Игнорируем ошибку, если сообщение не найдено
+            pass
 
     elif text == "📈 Статистика теста":
-        # Формируем отчёт
         stats = bot_data['stats']
         history = bot_data['history']
         
-        # Статистика за 7 дней
         week_ago = datetime.now() - timedelta(days=7)
         recent_signals = [s for s in history if datetime.fromisoformat(s['timestamp'].replace('Z', '+00:00')) >= week_ago]
         
@@ -360,7 +371,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         losses = len([s for s in recent_signals if s['result'] == 'loss'])
         accuracy = round(wins / total_signals * 100) if total_signals > 0 else 0
         
-        # Формируем сообщение
         message = (
             f"📊 Статистика теста — неделя 45 (4–8 ноября 2025)\n\n"
             f"📈 Общие итоги:\n"
@@ -370,12 +380,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"• Макс. просадка: -{stats['max_drawdown']:.1f}%\n\n"
         )
 
-        # Динамика по дням (пример)
         message += "📈 Динамика по дням:\n"
         days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
         for i, day in enumerate(days):
-            # Пример: 2 сигнала, 1 выиграл → 50%
-            pct = (i + 1) * 10  # Для примера
+            pct = (i + 1) * 10
             bar = make_bar(pct)
             message += f"{day} 🟢 +{pct/10:.1f}% {bar} ({pct}%) \n"
 
@@ -412,46 +420,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(message, reply_markup=reply_markup)
 
-# Обработчик нажатий на inline-кнопки "Мои монеты"
-async def button_handler_coins(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    if query.data == "add_coin":
-        await query.edit_message_text("➕ Введите монету для добавления (например: KAS)")
-        context.user_data['awaiting_add'] = True
-
-    elif query.data == "remove_coin":
-        await query.edit_message_text("➖ Введите монету для удаления (например: KAS)")
-        context.user_data['awaiting_remove'] = True
-
-# Обработчик сообщений (для ввода монеты)
-async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ALLOWED_USER_ID:
-        return
-
-    text = update.message.text
-
-    if context.user_data.get('awaiting_add'):
-        coin = text.upper()
-        if coin in bot_data['coins']:
-            await update.message.reply_text(f"✅ Монета {coin} уже в списке")
-        else:
-            bot_data['coins'].append(coin)
-            save_data(bot_data)  # ✅ СОХРАНИТЬ ДАННЫЕ
-            await update.message.reply_text(f"✅ Добавлена монета: {coin}")
-        context.user_data.pop('awaiting_add', None)
-
-    elif context.user_data.get('awaiting_remove'):
-        coin = text.upper()
-        if coin not in bot_data['coins']:
-            await update.message.reply_text(f"❌ Монета {coin} не найдена в списке")
-        else:
-            bot_data['coins'].remove(coin)
-            save_data(bot_data)  # ✅ СОХРАНИТЬ ДАННЫЕ
-            await update.message.reply_text(f"✅ Удалена монета: {coin}")
-        context.user_data.pop('awaiting_remove', None)
-
 # Функция для команды /ping
 async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ALLOWED_USER_ID:
@@ -462,15 +430,20 @@ async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Запуск бота
 if __name__ == "__main__":
     app = Application.builder().token(BOT_TOKEN).build()
+    
+    # Регистрируем обработчики
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("stats", show_stats))  # ✅ ДОБАВЛЕНА КОМАНДА /stats
+    app.add_handler(CommandHandler("stats", show_stats))
     app.add_handler(CommandHandler("ping", ping))
     app.add_handler(CommandHandler("add", add_coin))
     app.add_handler(CommandHandler("remove", remove_coin))
     app.add_handler(CommandHandler("coins", list_coins))
     app.add_handler(CommandHandler("settings", settings_menu))
+    
+    # ТОЛЬКО ОДИН обработчик кнопок и ОДИН обработчик текста
     app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(CallbackQueryHandler(button_handler_coins))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_input))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_all_messages))
+    
+    print("🟢 Бот запускается...")
     app.run_polling()
+    print("🔴 Бот остановлен")
