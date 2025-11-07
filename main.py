@@ -243,6 +243,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 pass  # Игнорируем ошибку, если сообщение не найдено
 
+        # Удаляем сообщение, откуда была нажата кнопка
+        try:
+            await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=update.message.message_id)
+        except:
+            pass  # Игнорируем ошибку, если сообщение не найдено
+
     elif text == "⚙️ Настройки":
         keyboard = [
             [InlineKeyboardButton(f"🔄 Режим: {bot_data['mode']}", callback_data="change_mode")],
