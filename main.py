@@ -272,11 +272,11 @@ async def button_handler_coins(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer()
 
     if query.data == "add_coin":
-        await query.edit_message_text("➕ Введите монету для добавления (например: KAS)")
+        await query.message.reply_text("➕ Введите монету для добавления (например: KAS)")
         context.user_data['awaiting_add'] = True
 
     elif query.data == "remove_coin":
-        await query.edit_message_text("➖ Введите монету для удаления (например: KAS)")
+        await query.message.reply_text("➖ Введите монету для удаления (например: KAS)")
         context.user_data['awaiting_remove'] = True
 
 # Обработчик сообщений (для ввода монеты)
