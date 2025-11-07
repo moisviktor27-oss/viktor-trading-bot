@@ -38,12 +38,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Формируем сообщение
     message = (
-        f"💰️💰️ BYBIT Dashboard | {update.effective_user.first_name}\n\n"
+        f"📊 BYBIT Dashboard | {update.effective_user.first_name}\n\n"
         f"⏰ {today} | 🧪 ТЕСТ\n"
         f"🟢 Статус: {bot_data['status']} (сканирует каждые 30 сек)\n"
         f"🔄 В работе: 0 сделок\n"
         f"🌐 BTC: 📈 +0.5% | Доминирование: 51%\n\n"
-        f"💲💲 Баланс: ${bot_data['balance_start']:.2f} → ${bot_data['balance_current']:.2f} ({bot_data['profit_pct']:+.1f}%)\n"
+        f"💰 Баланс: ${bot_data['balance_start']:.2f} → ${bot_data['balance_current']:.2f} ({bot_data['profit_pct']:+.1f}%)\n"
         f"🎯 Сигналов сегодня: {bot_data['signals_today']} из {bot_data['signals_max']}\n\n"
         f"📈 Прогресс дня:\n"
         f"| Профит  | {make_bar(bot_data['profit_pct'])} ({bot_data['profit_pct']:.0f}%) |\n"
@@ -183,11 +183,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Обработка кнопок монет
     elif query.data == "add_coin":
         await query.edit_message_text("➕ Введите монету для добавления (например: KAS)")
-        context.user_data['awaiting_add'] = True
+        context.user_data['awaiting_add'] = True  # ✅ ПРАВИЛЬНОЕ ИМЯ ПЕРЕМЕННОЙ
 
     elif query.data == "remove_coin":
         await query.edit_message_text("➖ Введите монету для удаления (например: KAS)")
-        context.user_data['awaiting_remove'] = True
+        context.user_data['awaiting_remove'] = True  # ✅ ПРАВИЛЬНОЕ ИМЯ ПЕРЕМЕННОЙ
 
 # Функция для кнопки "Мои монеты"
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -283,6 +283,7 @@ async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = update.message.text
 
+    # ✅ ПРАВИЛЬНАЯ ПРОВЕРКА СОСТОЯНИЯ
     if context.user_data.get('awaiting_add'):
         coin = text.upper()
         if coin in bot_data['coins']:
@@ -290,7 +291,7 @@ async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             bot_data['coins'].append(coin)
             await update.message.reply_text(f"✅ Добавлена монета: {coin}")
-        context.user_data.pop('awaiting_add', None)
+        context.user_data.pop('awaiting_add', None)  # ✅ ОЧИЩАЕМ СОСТОЯНИЕ
 
     elif context.user_data.get('awaiting_remove'):
         coin = text.upper()
@@ -299,7 +300,7 @@ async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             bot_data['coins'].remove(coin)
             await update.message.reply_text(f"✅ Удалена монета: {coin}")
-        context.user_data.pop('awaiting_remove', None)
+        context.user_data.pop('awaiting_remove', None)  # ✅ ОЧИЩАЕМ СОСТОЯНИЕ
 
 # Функция для команды /ping
 async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
