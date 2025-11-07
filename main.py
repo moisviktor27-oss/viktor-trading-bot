@@ -33,12 +33,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Обновляем данные
-    today = datetime.now().strftime("%-d %B %Y")
+    now = datetime.now()
+    today = now.strftime("%-d %B %Y, %H:%M:%S")
 
     # Формируем сообщение
     message = (
-        f"🌅 Доброе утро, {update.effective_user.first_name}!\n\n"
-        f"📆 {today} | 🧪 Режим: ТЕСТ\n"
+        f"📊 Bybit Dashboard | {update.effective_user.first_name}\n\n"
+        f"⏰ {today} | 🧪 Режим: ТЕСТ\n"
         f"🟢 Статус: {bot_data['status']} (сканирует каждые 30 сек)\n"
         f"🔄 В работе: 0 сделок\n"
         f"🌐 BTC: 📈 +0.5% | Доминирование: 51%\n\n"
@@ -48,7 +49,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"| Профит  | {make_bar(bot_data['profit_pct'])} ({bot_data['profit_pct']:.0f}%) |\n"
         f"| Точность| {make_bar(bot_data['accuracy'])} ({bot_data['accuracy']:.0f}%) |\n"
         f"| Риск    | {make_bar(bot_data['risk_pct'])} ({bot_data['risk_pct']:.0f}%) |\n\n"
-        f"👇 Что делаем?"
+        f"Что делаем?"
     )
 
     # Кнопки
