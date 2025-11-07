@@ -59,11 +59,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-    # Отправляем сообщение и запоминаем его ID
-    sent_message = await update.message.reply_text(message, reply_markup=reply_markup)
-    
-    # Сохраняем ID сообщения в user_data
-    context.user_data['dashboard_message_id'] = sent_message.message_id
+    # Отправляем сообщение
+    await update.message.reply_text(message, reply_markup=reply_markup)
 
 # Функция для команды /add
 async def add_coin(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -129,10 +126,7 @@ async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🔹 Статус: {bot_data['status']}\n"
         f"🔹 Сигналов в день: {bot_data['signals_max']}"
     )
-    sent_message = await update.message.reply_text(message, reply_markup=reply_markup)
-    
-    # Сохраняем ID сообщения
-    context.user_data['settings_message_id'] = sent_message.message_id
+    await update.message.reply_text(message, reply_markup=reply_markup)
 
 # Обработчик нажатий на кнопки
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -148,8 +142,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("RSI", callback_data="mode_RSI")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        sent_message = await query.edit_message_text("🔄 Выбери режим анализа:", reply_markup=reply_markup)
-        context.user_data['mode_message_id'] = sent_message.message_id
+        await query.edit_message_text("🔄 Выбери режим анализа:", reply_markup=reply_markup)
 
     elif query.data.startswith("mode_"):
         mode = query.data.split("_")[1]
@@ -173,8 +166,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("20", callback_data="limit_20")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        sent_message = await query.edit_message_text("📊 Выбери лимит сигналов в день:", reply_markup=reply_markup)
-        context.user_data['limit_message_id'] = sent_message.message_id
+        await query.edit_message_text("📊 Выбери лимит сигналов в день:", reply_markup=reply_markup)
 
     elif query.data.startswith("limit_"):
         limit = int(query.data.split("_")[1])
@@ -202,26 +194,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        sent_message = await update.message.reply_text(message, reply_markup=reply_markup)
-        context.user_data['coins_message_id'] = sent_message.message_id
+        await update.message.reply_text(message, reply_markup=reply_markup)
         
     elif text == "🔄 Обновить статус":
-        # Получаем все старые сообщения
-        old_messages = [
-            context.user_data.get('dashboard_message_id'),
-            context.user_data.get('settings_message_id'),
-            context.user_data.get('mode_message_id'),
-            context.user_data.get('limit_message_id'),
-            context.user_data.get('coins_message_id'),
-        ]
-
-        # Удаляем все старые сообщения
-        for msg_id in old_messages:
-            if msg_id:
+        # Удаляем все сообщения в чате (включая текущее)
+        try:
+            # Получаем историю чата (последние 100 сообщений)
+            chat_history = await context.bot.get_chat_history(chat_id=update.effective_chat.id, limit=100)
+            
+            # Удаляем все сообщения
+            for message in chat_history:
                 try:
-                    await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=msg_id)
+                    await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=message.message_id)
                 except:
                     pass  # Игнорируем ошибки
+        except:
+            pass  # Игнорируем ошибки
 
         # Обновляем данные
         now = datetime.now()
@@ -251,11 +239,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
         # Отправляем новое сообщение
-        new_message = await update.message.reply_text(message, reply_markup=reply_markup)
-        
-        # Сохраняем ID нового сообщения
-        context.user_data['dashboard_message_id'] = new_message.message_id
-        
+        await update.message.reply_text(message, reply_markup=reply_markup)
+
     elif text == "⚙️ Настройки":
         keyboard = [
             [InlineKeyboardButton(f"🔄 Режим: {bot_data['mode']}", callback_data="change_mode")],
@@ -271,8 +256,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🔹 Статус: {bot_data['status']}\n"
             f"🔹 Сигналов в день: {bot_data['signals_max']}"
         )
-        sent_message = await update.message.reply_text(message, reply_markup=reply_markup)
-        context.user_data['settings_message_id'] = sent_message.message_id
+        await update.message.reply_text(message, reply_markup=reply_markup)
 
 # Обработчик нажатий на кнопки "Мои монеты"
 async def button_handler_coins(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -280,14 +264,12 @@ async def button_handler_coins(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer()
 
     if query.data == "add_coin":
-        sent_message = await query.edit_message_text("➕ Введите монету для добавления (например: KAS)")
+        await query.edit_message_text("➕ Введите монету для добавления (например: KAS)")
         context.user_data['awaiting_add'] = True
-        context.user_data['add_message_id'] = sent_message.message_id
 
     elif query.data == "remove_coin":
-        sent_message = await query.edit_message_text("➖ Введите монету для удаления (например: KAS)")
+        await query.edit_message_text("➖ Введите монету для удаления (например: KAS)")
         context.user_data['awaiting_remove'] = True
-        context.user_data['remove_message_id'] = sent_message.message_id
 
 # Обработчик сообщений (для ввода монеты)
 async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -299,58 +281,20 @@ async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get('awaiting_add'):
         coin = text.upper()
         if coin in bot_data['coins']:
-            response = await update.message.reply_text(f"✅ Монета {coin} уже в списке")
+            await update.message.reply_text(f"✅ Монета {coin} уже в списке")
         else:
             bot_data['coins'].append(coin)
-            response = await update.message.reply_text(f"✅ Добавлена монета: {coin}")
-        
-        # Удаляем сообщение с вводом
-        try:
-            await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=update.message.message_id)
-        except:
-            pass
-        
-        # Удаляем сообщение с запросом
-        add_msg_id = context.user_data.get('add_message_id')
-        if add_msg_id:
-            try:
-                await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=add_msg_id)
-            except:
-                pass
-        
-        # Очищаем состояние
+            await update.message.reply_text(f"✅ Добавлена монета: {coin}")
         context.user_data.pop('awaiting_add', None)
-        context.user_data.pop('add_message_id', None)
-        # Отправляем ответное сообщение
-        await response.delete()
 
     elif context.user_data.get('awaiting_remove'):
         coin = text.upper()
         if coin not in bot_data['coins']:
-            response = await update.message.reply_text(f"❌ Монета {coin} не найдена в списке")
+            await update.message.reply_text(f"❌ Монета {coin} не найдена в списке")
         else:
             bot_data['coins'].remove(coin)
-            response = await update.message.reply_text(f"✅ Удалена монета: {coin}")
-        
-        # Удаляем сообщение с вводом
-        try:
-            await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=update.message.message_id)
-        except:
-            pass
-        
-        # Удаляем сообщение с запросом
-        remove_msg_id = context.user_data.get('remove_message_id')
-        if remove_msg_id:
-            try:
-                await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=remove_msg_id)
-            except:
-                pass
-        
-        # Очищаем состояние
+            await update.message.reply_text(f"✅ Удалена монета: {coin}")
         context.user_data.pop('awaiting_remove', None)
-        context.user_data.pop('remove_message_id', None)
-        # Отправляем ответное сообщение
-        await response.delete()
 
 # Функция для команды /ping
 async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
