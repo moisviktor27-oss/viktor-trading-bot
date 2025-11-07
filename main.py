@@ -223,12 +223,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-        # Удаляем старое сообщение
+        # Отправляем новое сообщение
+        new_message = await update.message.reply_text(message, reply_markup=reply_markup)
+        
+        # Удаляем старое сообщение (с кнопкой "🔄 Обновить статус")
         await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=update.message.message_id)
-        
-        # Отправляем новое
-        await update.message.reply_text(message, reply_markup=reply_markup)
-        
+
     elif text == "⚙️ Настройки":
         keyboard = [
             [InlineKeyboardButton(f"🔄 Режим: {bot_data['mode']}", callback_data="change_mode")],
