@@ -185,7 +185,50 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "📌 Мои монеты":
         coins_list = "\n".join([f"• {coin} ✅" for coin in bot_data['coins']])
         message = f"📌 Мои монеты\n\nСейчас отслеживаю {len(bot_data['coins'])} монет:\n{coins_list}\n\n➕ Добавить новую монету: /add KAS"
-        await update.message.reply_text(message)
+        
+        # Кнопки
+        keyboard = [
+            [InlineKeyboardButton("➕ Добавить", callback_data="add_coin")],
+            [InlineKeyboardButton("➖ Удалить", callback_data="remove_coin")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(message, reply_markup=reply_markup)
+        
+    elif text == "🔄 Обновить статус":
+        # Обновляем данные
+        now = datetime.now()
+        today = now.strftime("%-d %B %Y, %H:%M:%S")
+
+        # Формируем сообщение
+        message = (
+            f"📊 BYBIT Dashboard | {update.effective_user.first_name}\n\n"
+            f"⏰ {today} | 🧪 ТЕСТ\n"
+            f"🟢 Статус: {bot_data['status']} (сканирует каждые 30 сек)\n"
+            f"🔄 В работе: 0 сделок\n"
+            f"🌐 BTC: 📈 +0.5% | Доминирование: 51%\n\n"
+            f"💰 Баланс: ${bot_data['balance_start']:.2f} → ${bot_data['balance_current']:.2f} ({bot_data['profit_pct']:+.1f}%)\n"
+            f"🎯 Сигналов сегодня: {bot_data['signals_today']} из {bot_data['signals_max']}\n\n"
+            f"📈 Прогресс дня:\n"
+            f"| Профит  | {make_bar(bot_data['profit_pct'])} ({bot_data['profit_pct']:.0f}%) |\n"
+            f"| Точность| {make_bar(bot_data['accuracy'])} ({bot_data['accuracy']:.0f}%) |\n"
+            f"| Риск    | {make_bar(bot_data['risk_pct'])} ({bot_data['risk_pct']:.0f}%) |\n\n"
+        )
+
+        # Кнопки
+        keyboard = [
+            ["📊 Сигналы за сегодня", "📈 Статистика теста"],
+            ["⚙️ Настройки", "📌 Мои монеты"],
+            ["🔄 Обновить статус"]
+        ]
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+        # Удаляем старое сообщение
+        await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=update.message.message_id)
+        
+        # Отправляем новое
+        await update.message.reply_text(message, reply_markup=reply_markup)
+        
     elif text == "⚙️ Настройки":
         keyboard = [
             [InlineKeyboardButton(f"🔄 Режим: {bot_data['mode']}", callback_data="change_mode")],
@@ -202,6 +245,44 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🔹 Сигналов в день: {bot_data['signals_max']}"
         )
         await update.message.reply_text(message, reply_markup=reply_markup)
+
+# Обработчик нажатий на кнопки "Мои монеты"
+async def button_handler_coins(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "add_coin":
+        await query.edit_message_text("➕ Введите монету для добавления (например: KAS)")
+        context.user_data['awaiting_add'] = True
+
+    elif query.data == "remove_coin":
+        await query.edit_message_text("➖ Введите монету для удаления (например: KAS)")
+        context.user_data['awaiting_remove'] = True
+
+# Обработчик сообщений (для ввода монеты)
+async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ALLOWED_USER_ID:
+        return
+
+    text = update.message.text
+
+    if context.user_data.get('awaiting_add'):
+        coin = text.upper()
+        if coin in bot_data['coins']:
+            await update.message.reply_text(f"✅ Монета {coin} уже в списке")
+        else:
+            bot_data['coins'].append(coin)
+            await update.message.reply_text(f"✅ Добавлена монета: {coin}")
+        context.user_data.pop('awaiting_add', None)
+
+    elif context.user_data.get('awaiting_remove'):
+        coin = text.upper()
+        if coin not in bot_data['coins']:
+            await update.message.reply_text(f"❌ Монета {coin} не найдена в списке")
+        else:
+            bot_data['coins'].remove(coin)
+            await update.message.reply_text(f"✅ Удалена монета: {coin}")
+        context.user_data.pop('awaiting_remove', None)
 
 # Функция для команды /ping
 async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -220,5 +301,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("coins", list_coins))
     app.add_handler(CommandHandler("settings", settings_menu))
     app.add_handler(CallbackQueryHandler(button_handler))
+    app.add_handler(CallbackQueryHandler(button_handler_coins))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_input))
     app.run_polling()
