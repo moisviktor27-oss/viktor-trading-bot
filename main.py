@@ -59,8 +59,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-    # Отправляем сообщение
-    await update.message.reply_text(message, reply_markup=reply_markup)
+    # Отправляем сообщение и запоминаем его ID
+    sent_message = await update.message.reply_text(message, reply_markup=reply_markup)
+    
+    # Сохраняем ID сообщения в user_data
+    context.user_data['dashboard_message_id'] = sent_message.message_id
 
 # Функция для команды /add
 async def add_coin(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -197,19 +200,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(message, reply_markup=reply_markup)
         
     elif text == "🔄 Обновить статус":
-        # Удаляем все сообщения в чате (включая текущее)
-        try:
-            # Получаем историю чата (последние 100 сообщений)
-            chat_history = await context.bot.get_chat_history(chat_id=update.effective_chat.id, limit=100)
-            
-            # Удаляем все сообщения
-            for message in chat_history:
-                try:
-                    await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=message.message_id)
-                except:
-                    pass  # Игнорируем ошибки
-        except:
-            pass  # Игнорируем ошибки
+        # Получаем ID старого сообщения
+        old_message_id = context.user_data.get('dashboard_message_id')
 
         # Обновляем данные
         now = datetime.now()
@@ -239,7 +231,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
         # Отправляем новое сообщение
-        await update.message.reply_text(message, reply_markup=reply_markup)
+        new_message = await update.message.reply_text(message, reply_markup=reply_markup)
+        
+        # Сохраняем ID нового сообщения
+        context.user_data['dashboard_message_id'] = new_message.message_id
+        
+        # Удаляем старое сообщение (с дашбордом)
+        if old_message_id:
+            try:
+                await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=old_message_id)
+            except:
+                pass  # Игнорируем ошибку, если сообщение не найдено
 
     elif text == "⚙️ Настройки":
         keyboard = [
