@@ -131,11 +131,12 @@ async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(message, reply_markup=reply_markup)
 
-# Обработчик нажатий на кнопки
+# ОБЪЕДИНЕННЫЙ обработчик нажатий на кнопки
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
+    # Обработка настроек
     if query.data == "change_mode":
         # Кнопки для выбора режима
         keyboard = [
@@ -178,6 +179,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif query.data == "close_settings":
         await query.edit_message_text("⚙️ Настройки закрыты")
+
+    # Обработка кнопок монет
+    elif query.data == "add_coin":
+        await query.edit_message_text("➕ Введите монету для добавления (например: KAS)")
+        context.user_data['awaiting_add'] = True
+
+    elif query.data == "remove_coin":
+        await query.edit_message_text("➖ Введите монету для удаления (например: KAS)")
+        context.user_data['awaiting_remove'] = True
 
 # Функция для кнопки "Мои монеты"
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -266,19 +276,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(message, reply_markup=reply_markup)
 
-# Обработчик нажатий на inline-кнопки "Мои монеты"
-async def button_handler_coins(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    if query.data == "add_coin":
-        await query.message.reply_text("➕ Введите монету для добавления (например: KAS)")
-        context.user_data['awaiting_add'] = True
-
-    elif query.data == "remove_coin":
-        await query.message.reply_text("➖ Введите монету для удаления (например: KAS)")
-        context.user_data['awaiting_remove'] = True
-
 # Обработчик сообщений (для ввода монеты)
 async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ALLOWED_USER_ID:
@@ -320,8 +317,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("remove", remove_coin))
     app.add_handler(CommandHandler("coins", list_coins))
     app.add_handler(CommandHandler("settings", settings_menu))
-    app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(CallbackQueryHandler(button_handler_coins))  # ✅ ЭТА СТРОКА ПОДКЛЮЧАЕТ КНОПКИ МОНЕТ
+    app.add_handler(CallbackQueryHandler(button_handler))  # ТОЛЬКО ОДИН обработчик кнопок
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_input))
     app.run_polling()
