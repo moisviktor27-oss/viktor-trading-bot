@@ -3,6 +3,14 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 from datetime import datetime, timedelta
 import json
 import os
+import logging
+
+# Настройка логирования
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
 # ТВОЙ ТОКЕН
 BOT_TOKEN = "8572689919:AAHYMpKOdp2ejZpq7n64mKOIIjDa2xTn-80"
@@ -40,31 +48,40 @@ DEFAULT_DATA = {
 # Функция загрузки данных
 def load_data():
     if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r") as f:
-            return json.load(f)
+        try:
+            with open(DATA_FILE, "r", encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error(f"Ошибка загрузки данных: {e}")
+            return DEFAULT_DATA.copy()
     return DEFAULT_DATA.copy()
 
 # Функция сохранения данных
 def save_data(data):
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=2)
+    try:
+        with open(DATA_FILE, "w", encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"Ошибка сохранения данных: {e}")
 
 # Загружаем данные при запуске
 bot_data = load_data()
 
 # Функция для генерации ASCII-бара
 def make_bar(percentage, length=17):
+    percentage = max(0, min(100, percentage))  # Ограничиваем от 0 до 100
     filled = int(percentage / 100 * length)
     return "█" * filled + "░" * (length - filled)
 
 # Функция главного меню
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ALLOWED_USER_ID:
+        await update.message.reply_text("❌ Доступ запрещен")
         return
 
     # Обновляем данные
     now = datetime.now()
-    today = now.strftime("%-d %B %Y, %H:%M:%S")
+    today = now.strftime("%d %B %Y, %H:%M:%S")
 
     # Формируем сообщение
     message = (
@@ -106,11 +123,27 @@ async def show_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Статистика за 7 дней
     week_ago = datetime.now() - timedelta(days=7)
-    recent_signals = [s for s in history if datetime.fromisoformat(s['timestamp'].replace('Z', '+00:00')) >= week_ago]
+    recent_signals = []
+    
+    for signal in history:
+        try:
+            if 'timestamp' in signal:
+                # Пробуем разные форматы даты
+                timestamp_str = signal['timestamp']
+                if 'Z' in timestamp_str:
+                    timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                else:
+                    timestamp = datetime.fromisoformat(timestamp_str)
+                
+                if timestamp >= week_ago:
+                    recent_signals.append(signal)
+        except Exception as e:
+            logger.error(f"Ошибка обработки времени сигнала: {e}")
+            continue
     
     total_signals = len(recent_signals)
-    wins = len([s for s in recent_signals if s['result'] == 'win'])
-    losses = len([s for s in recent_signals if s['result'] == 'loss'])
+    wins = len([s for s in recent_signals if s.get('result') == 'win'])
+    losses = len([s for s in recent_signals if s.get('result') == 'loss'])
     accuracy = round(wins / total_signals * 100) if total_signals > 0 else 0
     
     # Формируем сообщение
@@ -164,7 +197,7 @@ async def add_coin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     bot_data['coins'].append(coin)
-    save_data(bot_data)  # ✅ СОХРАНИТЬ ДАННЫЕ
+    save_data(bot_data)
     await update.message.reply_text(f"✅ Добавлена монета: {coin}")
 
 # Функция для команды /remove
@@ -183,7 +216,7 @@ async def remove_coin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     bot_data['coins'].remove(coin)
-    save_data(bot_data)  # ✅ СОХРАНИТЬ ДАННЫЕ
+    save_data(bot_data)
     await update.message.reply_text(f"✅ Удалена монета: {coin}")
 
 # Функция для команды /coins
@@ -236,7 +269,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data.startswith("mode_"):
         mode = query.data.split("_")[1]
         bot_data['settings']['mode'] = mode
-        save_data(bot_data)  # ✅ СОХРАНИТЬ ДАННЫЕ
+        save_data(bot_data)
         await query.edit_message_text(f"✅ Режим изменён: {mode}")
 
     elif query.data == "toggle_pause":
@@ -246,7 +279,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             bot_data['settings']['status'] = "РАБОТАЕТ"
             status_text = "▶️ Бот возобновил работу"
-        save_data(bot_data)  # ✅ СОХРАНИТЬ ДАННЫЕ
+        save_data(bot_data)
         await query.edit_message_text(status_text)
 
     elif query.data == "change_limit":
@@ -262,7 +295,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data.startswith("limit_"):
         limit = int(query.data.split("_")[1])
         bot_data['settings']['signals_max'] = limit
-        save_data(bot_data)  # ✅ СОХРАНИТЬ ДАННЫЕ
+        save_data(bot_data)
         await query.edit_message_text(f"✅ Лимит изменён: {limit}")
 
     elif query.data == "close_settings":
@@ -280,6 +313,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ЕДИНЫЙ обработчик текстовых сообщений
 async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ALLOWED_USER_ID:
+        await update.message.reply_text("❌ Доступ запрещен")
         return
 
     text = update.message.text
@@ -291,7 +325,7 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
             await update.message.reply_text(f"✅ Монета {coin} уже в списке")
         else:
             bot_data['coins'].append(coin)
-            save_data(bot_data)  # ✅ СОХРАНИТЬ ДАННЫЕ
+            save_data(bot_data)
             await update.message.reply_text(f"✅ Добавлена монета: {coin}")
         context.user_data.pop('awaiting_add', None)
         return
@@ -302,7 +336,7 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
             await update.message.reply_text(f"❌ Монета {coin} не найдена в списке")
         else:
             bot_data['coins'].remove(coin)
-            save_data(bot_data)  # ✅ СОХРАНИТЬ ДАННЫЕ
+            save_data(bot_data)
             await update.message.reply_text(f"✅ Удалена монета: {coin}")
         context.user_data.pop('awaiting_remove', None)
         return
@@ -310,7 +344,7 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Обработка кнопок главного меню
     if text == "📌 Мои монеты":
         coins_list = "\n".join([f"• {coin} ✅" for coin in bot_data['coins']])
-        message = f"📌 Мои монеты\n\nСейчас отслеживаю {len(bot_data['coins'])} монет:\n{coins_list}\n\n➕ Добавить новую монету: /add KAS"
+        message = f"📌 Мои монеты\n\nСейчас отслеживаю {len(bot_data['coins'])} монет:\n{coins_list}"
 
         # Кнопки
         keyboard = [
@@ -327,7 +361,7 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         # Обновляем данные
         now = datetime.now()
-        today = now.strftime("%-d %B %Y, %H:%M:%S")
+        today = now.strftime("%d %B %Y, %H:%M:%S")
 
         # Формируем сообщение
         message = (
@@ -362,14 +396,14 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         if old_message_id:
             try:
                 await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=old_message_id)
-            except:
-                pass  # Игнорируем ошибку, если сообщение не найдено
+            except Exception as e:
+                logger.error(f"Ошибка удаления сообщения: {e}")
 
         # Удаляем сообщение, откуда была нажата кнопка
         try:
             await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=update.message.message_id)
-        except:
-            pass  # Игнорируем ошибку, если сообщение не найдено
+        except Exception as e:
+            logger.error(f"Ошибка удаления сообщения: {e}")
 
     elif text == "📈 Статистика теста":
         # Вызываем функцию статистики
@@ -392,6 +426,15 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         await update.message.reply_text(message, reply_markup=reply_markup)
 
+    elif text == "📊 Сигналы за сегодня":
+        # Заглушка для сигналов за сегодня
+        message = (
+            "📊 Сигналы за сегодня\n\n"
+            "Сегодня еще не было сигналов.\n"
+            "Сигналы будут отображаться здесь после начала работы бота."
+        )
+        await update.message.reply_text(message)
+
 # Функция для команды /ping
 async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ALLOWED_USER_ID:
@@ -399,16 +442,70 @@ async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_time = datetime.now().strftime("%H:%M:%S")
     await update.message.reply_text(f"🟢 Бот жив! Время: {current_time}")
 
+# Функция для команды /help
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ALLOWED_USER_ID:
+        return
+    
+    help_text = """
+🤖 **Доступные команды:**
+
+/start - Запустить бота и показать дашборд
+/ping - Проверить работоспособность бота
+/stats - Показать статистику
+/coins - Список отслеживаемых монет
+/add [монета] - Добавить монету
+/remove [монета] - Удалить монету
+/settings - Открыть настройки
+/help - Показать эту справку
+
+📋 **Кнопки главного меню:**
+- 📊 Сигналы за сегодня - История сигналов
+- 📈 Статистика теста - Детальная статистика
+- ⚙️ Настройки - Настройки бота
+- 📌 Мои монеты - Управление монетами
+- 🔄 Обновить статус - Обновить дашборд
+    """
+    await update.message.reply_text(help_text)
+
+# Обработчик ошибок
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.error(f"Ошибка при обработке update {update}: {context.error}")
+
 # Запуск бота
+def main():
+    try:
+        print("🤖 Запускаю бота...")
+        
+        # Создаем приложение
+        application = Application.builder().token(BOT_TOKEN).build()
+        
+        # Добавляем обработчики
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("stats", show_stats))
+        application.add_handler(CommandHandler("ping", ping))
+        application.add_handler(CommandHandler("help", help_command))
+        application.add_handler(CommandHandler("add", add_coin))
+        application.add_handler(CommandHandler("remove", remove_coin))
+        application.add_handler(CommandHandler("coins", list_coins))
+        application.add_handler(CommandHandler("settings", settings_menu))
+        
+        # Обработчики callback и сообщений
+        application.add_handler(CallbackQueryHandler(button_handler))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_all_messages))
+        
+        # Обработчик ошибок
+        application.add_error_handler(error_handler)
+        
+        print("✅ Бот запущен! Ожидаю сообщения...")
+        print("📱 Откройте Telegram и отправьте /start")
+        
+        # Запускаем бота
+        application.run_polling()
+        
+    except Exception as e:
+        print(f"❌ Критическая ошибка: {e}")
+        logger.error(f"Критическая ошибка: {e}")
+
 if __name__ == "__main__":
-    app = Application.builder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("stats", show_stats))  # ✅ ПОДКЛЮЧЕНА КОМАНДА /stats
-    app.add_handler(CommandHandler("ping", ping))
-    app.add_handler(CommandHandler("add", add_coin))
-    app.add_handler(CommandHandler("remove", remove_coin))
-    app.add_handler(CommandHandler("coins", list_coins))
-    app.add_handler(CommandHandler("settings", settings_menu))
-    app.add_handler(CallbackQueryHandler(button_handler))  # ✅ ОДИН обработчик кнопок
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_all_messages))  # ✅ ОДИН обработчик сообщений
-    app.run_polling()
+    main()
