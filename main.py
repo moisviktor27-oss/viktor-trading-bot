@@ -1,8 +1,6 @@
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
-from datetime import datetime, timedelta
-import json
-import os
+from datetime import datetime
 
 # ТВОЙ ТОКЕН
 BOT_TOKEN = "8572689919:AAHYMpKOdp2ejZpq7n64mKOIIjDa2xTn-80"
@@ -10,47 +8,19 @@ BOT_TOKEN = "8572689919:AAHYMpKOdp2ejZpq7n64mKOIIjDa2xTn-80"
 # ТВОЙ USER ID
 ALLOWED_USER_ID = 1346576926
 
-# Путь к файлу данных
-DATA_FILE = "data.json"
-
-# Дефолтные данные
-DEFAULT_DATA = {
-    "settings": {
-        "mode": "Auto",
-        "status": "РАБОТАЕТ",
-        "signals_max": 15
-    },
+# Данные в памяти (не сохраняются между перезапусками)
+bot_data = {
+    "mode": "Auto",
+    "status": "РАБОТАЕТ",
     "coins": ["BTC", "ETH", "KAS"],
-    "balance": {
-        "start": 100.00,
-        "current": 100.00
-    },
-    "stats": {
-        "signals_today": 0,
-        "signals_total": 0,
-        "wins": 0,
-        "losses": 0,
-        "accuracy": 0,
-        "profit_total": 0.0,
-        "max_drawdown": 0.0
-    },
-    "history": []
+    "signals_today": 0,
+    "signals_max": 15,
+    "balance_start": 100.00,
+    "balance_current": 100.00,
+    "profit_pct": 0.0,
+    "accuracy": 0,
+    "risk_pct": 0
 }
-
-# Функция загрузки данных
-def load_data():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r") as f:
-            return json.load(f)
-    return DEFAULT_DATA.copy()
-
-# Функция сохранения данных
-def save_data(data):
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-
-# Загружаем данные при запуске
-bot_data = load_data()
 
 # Функция для генерации ASCII-бара
 def make_bar(percentage, length=17):
@@ -70,15 +40,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = (
         f"💰💰 BYBIT Dashboard | {update.effective_user.first_name}\n\n"
         f"⏰ {today} | 🧪 ТЕСТ\n"
-        f"🟢 Статус: {bot_data['settings']['status']} (сканирует каждые 30 сек)\n"
+        f"🟢 Статус: {bot_data['status']} (сканирует каждые 30 сек)\n"
         f"🔄 В работе: 0 сделок\n"
         f"🌐 BTC: 📈 +0.5% | Доминирование: 51%\n\n"
-        f"💲💲 Баланс: ${bot_data['balance']['start']:.2f} → ${bot_data['balance']['current']:.2f} ({bot_data['stats']['profit_total']:+.1f}%)\n"
-        f"🎯 Сигналов сегодня: {bot_data['stats']['signals_today']} из {bot_data['settings']['signals_max']}\n\n"
+        f"💲💲 Баланс: ${bot_data['balance_start']:.2f} → ${bot_data['balance_current']:.2f} ({bot_data['profit_pct']:+.1f}%)\n"
+        f"🎯 Сигналов сегодня: {bot_data['signals_today']} из {bot_data['signals_max']}\n\n"
         f"📈 Прогресс дня:\n"
-        f"| Профит  | {make_bar(bot_data['stats']['profit_total'])} ({bot_data['stats']['profit_total']:.0f}%) |\n"
-        f"| Точность| {make_bar(bot_data['stats']['accuracy'])} ({bot_data['stats']['accuracy']:.0f}%) |\n"
-        f"| Риск    | {make_bar(bot_data['stats']['max_drawdown'])} ({bot_data['stats']['max_drawdown']:.0f}%) |\n\n"
+        f"| Профит  | {make_bar(bot_data['profit_pct'])} ({bot_data['profit_pct']:.0f}%) |\n"
+        f"| Точность| {make_bar(bot_data['accuracy'])} ({bot_data['accuracy']:.0f}%) |\n"
+        f"| Риск    | {make_bar(bot_data['risk_pct'])} ({bot_data['risk_pct']:.0f}%) |\n\n"
     )
 
     # Кнопки
@@ -94,59 +64,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Сохраняем ID сообщения в user_data
     context.user_data['dashboard_message_id'] = sent_message.message_id
-
-# Функция для команды /stats
-async def show_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ALLOWED_USER_ID:
-        return
-
-    # Формируем отчёт
-    stats = bot_data['stats']
-    history = bot_data['history']
-    
-    # Статистика за 7 дней
-    week_ago = datetime.now() - timedelta(days=7)
-    recent_signals = [s for s in history if datetime.fromisoformat(s['timestamp'].replace('Z', '+00:00')) >= week_ago]
-    
-    total_signals = len(recent_signals)
-    wins = len([s for s in recent_signals if s['result'] == 'win'])
-    losses = len([s for s in recent_signals if s['result'] == 'loss'])
-    accuracy = round(wins / total_signals * 100) if total_signals > 0 else 0
-    
-    # Формируем сообщение
-    message = (
-        f"📊 Статистика теста — неделя 45 (4–8 ноября 2025)\n\n"
-        f"📈 Общие итоги:\n"
-        f"• Сигналов: {total_signals}\n"
-        f"• Точных: {wins} ({accuracy}%)\n"
-        f"• Общий профит: +{stats['profit_total']:.1f}%\n"
-        f"• Макс. просадка: -{stats['max_drawdown']:.1f}%\n\n"
-    )
-
-    # Динамика по дням (пример)
-    message += "📈 Динамика по дням:\n"
-    days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
-    for i, day in enumerate(days):
-        # Пример: 2 сигнала, 1 выиграл → 50%
-        pct = (i + 1) * 10  # Для примера
-        bar = make_bar(pct)
-        message += f"{day} 🟢 +{pct/10:.1f}% {bar} ({pct}%) \n"
-
-    message += "\n🔍 Анализ провалов (27 ❌):\n"
-    message += "• 14 — против тренда 1h\n"
-    message += "• 11 — объём < 80% среднего\n"
-    message += "•  8 — время: 00:00–06:00 UTC\n\n"
-
-    message += "🧠 Топ-3 рабочих паттерна:\n"
-    message += "1. Пробой 4h максимума + объём ≥ 120% → 82%\n"
-    message += "2. Отскок от дневной поддержки + RSI < 40 → 76%\n"
-    message += "3. Дивергенция на 1h в бычьем тренде → 70%\n\n"
-
-    message += "🧩 Рекомендация:\n"
-    message += "Запретить сигналы между 00:00–06:00 UTC и при объёме < 85%.\n"
-    message += "Ожидаемый рост точности: до 68–72%."
-
-    await update.message.reply_text(message)
 
 # Функция для команды /add
 async def add_coin(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -164,7 +81,6 @@ async def add_coin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     bot_data['coins'].append(coin)
-    save_data(bot_data)
     await update.message.reply_text(f"✅ Добавлена монета: {coin}")
 
 # Функция для команды /remove
@@ -183,7 +99,6 @@ async def remove_coin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     bot_data['coins'].remove(coin)
-    save_data(bot_data)
     await update.message.reply_text(f"✅ Удалена монета: {coin}")
 
 # Функция для команды /coins
@@ -201,18 +116,18 @@ async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     keyboard = [
-        [InlineKeyboardButton(f"🔄 Режим: {bot_data['settings']['mode']}", callback_data="change_mode")],
-        [InlineKeyboardButton(f"⏸️ Статус: {bot_data['settings']['status']}", callback_data="toggle_pause")],
-        [InlineKeyboardButton(f"📊 Лимит: {bot_data['settings']['signals_max']}", callback_data="change_limit")],
+        [InlineKeyboardButton(f"🔄 Режим: {bot_data['mode']}", callback_data="change_mode")],
+        [InlineKeyboardButton(f"⏸️ Статус: {bot_data['status']}", callback_data="toggle_pause")],
+        [InlineKeyboardButton(f"📊 Лимит: {bot_data['signals_max']}", callback_data="change_limit")],
         [InlineKeyboardButton("❌ Закрыть", callback_data="close_settings")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     message = (
         f"⚙️ Настройки\n\n"
-        f"🔹 Режим анализа: {bot_data['settings']['mode']}\n"
-        f"🔹 Статус: {bot_data['settings']['status']}\n"
-        f"🔹 Сигналов в день: {bot_data['settings']['signals_max']}"
+        f"🔹 Режим анализа: {bot_data['mode']}\n"
+        f"🔹 Статус: {bot_data['status']}\n"
+        f"🔹 Сигналов в день: {bot_data['signals_max']}"
     )
     await update.message.reply_text(message, reply_markup=reply_markup)
 
@@ -223,6 +138,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Обработка настроек
     if query.data == "change_mode":
+        # Кнопки для выбора режима
         keyboard = [
             [InlineKeyboardButton("Auto", callback_data="mode_Auto")],
             [InlineKeyboardButton("Swing", callback_data="mode_Swing")],
@@ -234,21 +150,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif query.data.startswith("mode_"):
         mode = query.data.split("_")[1]
-        bot_data['settings']['mode'] = mode
-        save_data(bot_data)
+        bot_data['mode'] = mode
         await query.edit_message_text(f"✅ Режим изменён: {mode}")
 
     elif query.data == "toggle_pause":
-        if bot_data['settings']['status'] == "РАБОТАЕТ":
-            bot_data['settings']['status'] = "ПАУЗА"
+        if bot_data['status'] == "РАБОТАЕТ":
+            bot_data['status'] = "ПАУЗА"
             status_text = "⏸️ Бот поставлен на паузу"
         else:
-            bot_data['settings']['status'] = "РАБОТАЕТ"
+            bot_data['status'] = "РАБОТАЕТ"
             status_text = "▶️ Бот возобновил работу"
-        save_data(bot_data)
         await query.edit_message_text(status_text)
 
     elif query.data == "change_limit":
+        # Кнопки для выбора лимита
         keyboard = [
             [InlineKeyboardButton("10", callback_data="limit_10")],
             [InlineKeyboardButton("15", callback_data="limit_15")],
@@ -259,8 +174,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif query.data.startswith("limit_"):
         limit = int(query.data.split("_")[1])
-        bot_data['settings']['signals_max'] = limit
-        save_data(bot_data)
+        bot_data['signals_max'] = limit
         await query.edit_message_text(f"✅ Лимит изменён: {limit}")
 
     elif query.data == "close_settings":
@@ -289,7 +203,6 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
             await update.message.reply_text(f"✅ Монета {coin} уже в списке")
         else:
             bot_data['coins'].append(coin)
-            save_data(bot_data)
             await update.message.reply_text(f"✅ Добавлена монета: {coin}")
         context.user_data.pop('awaiting_add', None)
         return
@@ -300,7 +213,6 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
             await update.message.reply_text(f"❌ Монета {coin} не найдена в списке")
         else:
             bot_data['coins'].remove(coin)
-            save_data(bot_data)
             await update.message.reply_text(f"✅ Удалена монета: {coin}")
         context.user_data.pop('awaiting_remove', None)
         return
@@ -310,6 +222,7 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         coins_list = "\n".join([f"• {coin} ✅" for coin in bot_data['coins']])
         message = f"📌 Мои монеты\n\nСейчас отслеживаю {len(bot_data['coins'])} монет:\n{coins_list}\n\n➕ Добавить новую монету: /add KAS"
         
+        # Кнопки
         keyboard = [
             [InlineKeyboardButton("➕ Добавить", callback_data="add_coin")],
             [InlineKeyboardButton("➖ Удалить", callback_data="remove_coin")]
@@ -319,25 +232,29 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(message, reply_markup=reply_markup)
         
     elif text == "🔄 Обновить статус":
+        # Получаем ID старого сообщения
         old_message_id = context.user_data.get('dashboard_message_id')
 
+        # Обновляем данные
         now = datetime.now()
         today = now.strftime("%-d %B %Y, %H:%M:%S")
 
+        # Формируем сообщение
         message = (
             f"💰💰 BYBIT Dashboard | {update.effective_user.first_name}\n\n"
             f"⏰ {today} | 🧪 ТЕСТ\n"
-            f"🟢 Статус: {bot_data['settings']['status']} (сканирует каждые 30 сек)\n"
+            f"🟢 Статус: {bot_data['status']} (сканирует каждые 30 сек)\n"
             f"🔄 В работе: 0 сделок\n"
             f"🌐 BTC: 📈 +0.5% | Доминирование: 51%\n\n"
-            f"💲💲 Баланс: ${bot_data['balance']['start']:.2f} → ${bot_data['balance']['current']:.2f} ({bot_data['stats']['profit_total']:+.1f}%)\n"
-            f"🎯 Сигналов сегодня: {bot_data['stats']['signals_today']} из {bot_data['settings']['signals_max']}\n\n"
+            f"💲💲 Баланс: ${bot_data['balance_start']:.2f} → ${bot_data['balance_current']:.2f} ({bot_data['profit_pct']:+.1f}%)\n"
+            f"🎯 Сигналов сегодня: {bot_data['signals_today']} из {bot_data['signals_max']}\n\n"
             f"📈 Прогресс дня:\n"
-            f"| Профит  | {make_bar(bot_data['stats']['profit_total'])} ({bot_data['stats']['profit_total']:.0f}%) |\n"
-            f"| Точность| {make_bar(bot_data['stats']['accuracy'])} ({bot_data['stats']['accuracy']:.0f}%) |\n"
-            f"| Риск    | {make_bar(bot_data['stats']['max_drawdown'])} ({bot_data['stats']['max_drawdown']:.0f}%) |\n\n"
+            f"| Профит  | {make_bar(bot_data['profit_pct'])} ({bot_data['profit_pct']:.0f}%) |\n"
+            f"| Точность| {make_bar(bot_data['accuracy'])} ({bot_data['accuracy']:.0f}%) |\n"
+            f"| Риск    | {make_bar(bot_data['risk_pct'])} ({bot_data['risk_pct']:.0f}%) |\n\n"
         )
 
+        # Кнопки
         keyboard = [
             ["📊 Сигналы за сегодня", "📈 Статистика теста"],
             ["⚙️ Настройки", "📌 Мои монеты"],
@@ -345,78 +262,39 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
+        # Отправляем новое сообщение
         new_message = await update.message.reply_text(message, reply_markup=reply_markup)
+        
+        # Сохраняем ID нового сообщения
         context.user_data['dashboard_message_id'] = new_message.message_id
         
+        # Удаляем старое сообщение (с дашбордом)
         if old_message_id:
             try:
                 await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=old_message_id)
             except:
-                pass
+                pass  # Игнорируем ошибку, если сообщение не найдено
 
+        # Удаляем сообщение, откуда была нажата кнопка
         try:
             await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=update.message.message_id)
         except:
-            pass
-
-    elif text == "📈 Статистика теста":
-        stats = bot_data['stats']
-        history = bot_data['history']
-        
-        week_ago = datetime.now() - timedelta(days=7)
-        recent_signals = [s for s in history if datetime.fromisoformat(s['timestamp'].replace('Z', '+00:00')) >= week_ago]
-        
-        total_signals = len(recent_signals)
-        wins = len([s for s in recent_signals if s['result'] == 'win'])
-        losses = len([s for s in recent_signals if s['result'] == 'loss'])
-        accuracy = round(wins / total_signals * 100) if total_signals > 0 else 0
-        
-        message = (
-            f"📊 Статистика теста — неделя 45 (4–8 ноября 2025)\n\n"
-            f"📈 Общие итоги:\n"
-            f"• Сигналов: {total_signals}\n"
-            f"• Точных: {wins} ({accuracy}%)\n"
-            f"• Общий профит: +{stats['profit_total']:.1f}%\n"
-            f"• Макс. просадка: -{stats['max_drawdown']:.1f}%\n\n"
-        )
-
-        message += "📈 Динамика по дням:\n"
-        days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
-        for i, day in enumerate(days):
-            pct = (i + 1) * 10
-            bar = make_bar(pct)
-            message += f"{day} 🟢 +{pct/10:.1f}% {bar} ({pct}%) \n"
-
-        message += "\n🔍 Анализ провалов (27 ❌):\n"
-        message += "• 14 — против тренда 1h\n"
-        message += "• 11 — объём < 80% среднего\n"
-        message += "•  8 — время: 00:00–06:00 UTC\n\n"
-
-        message += "🧠 Топ-3 рабочих паттерна:\n"
-        message += "1. Пробой 4h максимума + объём ≥ 120% → 82%\n"
-        message += "2. Отскок от дневной поддержки + RSI < 40 → 76%\n"
-        message += "3. Дивергенция на 1h в бычьем тренде → 70%\n\n"
-
-        message += "🧩 Рекомендация:\n"
-        message += "Запретить сигналы между 00:00–06:00 UTC и при объёме < 85%.\n"
-        message += "Ожидаемый рост точности: до 68–72%."
-
-        await update.message.reply_text(message)
+            pass  # Игнорируем ошибку, если сообщение не найдено
 
     elif text == "⚙️ Настройки":
         keyboard = [
-            [InlineKeyboardButton(f"🔄 Режим: {bot_data['settings']['mode']}", callback_data="change_mode")],
-            [InlineKeyboardButton(f"⏸️ Статус: {bot_data['settings']['status']}", callback_data="toggle_pause")],
-            [InlineKeyboardButton(f"📊 Лимит: {bot_data['settings']['signals_max']}", callback_data="change_limit")],
+            [InlineKeyboardButton(f"🔄 Режим: {bot_data['mode']}", callback_data="change_mode")],
+            [InlineKeyboardButton(f"⏸️ Статус: {bot_data['status']}", callback_data="toggle_pause")],
+            [InlineKeyboardButton(f"📊 Лимит: {bot_data['signals_max']}", callback_data="change_limit")],
             [InlineKeyboardButton("❌ Закрыть", callback_data="close_settings")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         message = (
             f"⚙️ Настройки\n\n"
-            f"🔹 Режим анализа: {bot_data['settings']['mode']}\n"
-            f"🔹 Статус: {bot_data['settings']['status']}\n"
-            f"🔹 Сигналов в день: {bot_data['settings']['signals_max']}"
+            f"🔹 Режим анализа: {bot_data['mode']}\n"
+            f"🔹 Статус: {bot_data['status']}\n"
+            f"🔹 Сигналов в день: {bot_data['signals_max']}"
         )
         await update.message.reply_text(message, reply_markup=reply_markup)
 
@@ -430,20 +308,12 @@ async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Запуск бота
 if __name__ == "__main__":
     app = Application.builder().token(BOT_TOKEN).build()
-    
-    # Регистрируем обработчики
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("stats", show_stats))
     app.add_handler(CommandHandler("ping", ping))
     app.add_handler(CommandHandler("add", add_coin))
     app.add_handler(CommandHandler("remove", remove_coin))
     app.add_handler(CommandHandler("coins", list_coins))
     app.add_handler(CommandHandler("settings", settings_menu))
-    
-    # ТОЛЬКО ОДИН обработчик кнопок и ОДИН обработчик текста
-    app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_all_messages))
-    
-    print("🟢 Бот запускается...")
+    app.add_handler(CallbackQueryHandler(button_handler))  # ТОЛЬКО ОДИН обработчик кнопок
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_all_messages))  # ОДИН обработчик текста
     app.run_polling()
-    print("🔴 Бот остановлен")
