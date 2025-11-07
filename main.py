@@ -183,19 +183,41 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Обработка кнопок монет
     elif query.data == "add_coin":
         await query.edit_message_text("➕ Введите монету для добавления (например: KAS)")
-        context.user_data['awaiting_add'] = True  # ✅ ПРАВИЛЬНОЕ ИМЯ ПЕРЕМЕННОЙ
+        context.user_data['awaiting_add'] = True
 
     elif query.data == "remove_coin":
         await query.edit_message_text("➖ Введите монету для удаления (например: KAS)")
-        context.user_data['awaiting_remove'] = True  # ✅ ПРАВИЛЬНОЕ ИМЯ ПЕРЕМЕННОЙ
+        context.user_data['awaiting_remove'] = True
 
-# Функция для кнопки "Мои монеты"
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ОБЪЕДИНЕННЫЙ обработчик текстовых сообщений
+async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ALLOWED_USER_ID:
         return
 
     text = update.message.text
+    
+    # Проверяем, ожидаем ли мы ввод монеты для добавления/удаления
+    if context.user_data.get('awaiting_add'):
+        coin = text.upper()
+        if coin in bot_data['coins']:
+            await update.message.reply_text(f"✅ Монета {coin} уже в списке")
+        else:
+            bot_data['coins'].append(coin)
+            await update.message.reply_text(f"✅ Добавлена монета: {coin}")
+        context.user_data.pop('awaiting_add', None)
+        return
+        
+    elif context.user_data.get('awaiting_remove'):
+        coin = text.upper()
+        if coin not in bot_data['coins']:
+            await update.message.reply_text(f"❌ Монета {coin} не найдена в списке")
+        else:
+            bot_data['coins'].remove(coin)
+            await update.message.reply_text(f"✅ Удалена монета: {coin}")
+        context.user_data.pop('awaiting_remove', None)
+        return
 
+    # Обработка кнопок главного меню
     if text == "📌 Мои монеты":
         coins_list = "\n".join([f"• {coin} ✅" for coin in bot_data['coins']])
         message = f"📌 Мои монеты\n\nСейчас отслеживаю {len(bot_data['coins'])} монет:\n{coins_list}\n\n➕ Добавить новую монету: /add KAS"
@@ -276,32 +298,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(message, reply_markup=reply_markup)
 
-# Обработчик сообщений (для ввода монеты)
-async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ALLOWED_USER_ID:
-        return
-
-    text = update.message.text
-
-    # ✅ ПРАВИЛЬНАЯ ПРОВЕРКА СОСТОЯНИЯ
-    if context.user_data.get('awaiting_add'):
-        coin = text.upper()
-        if coin in bot_data['coins']:
-            await update.message.reply_text(f"✅ Монета {coin} уже в списке")
-        else:
-            bot_data['coins'].append(coin)
-            await update.message.reply_text(f"✅ Добавлена монета: {coin}")
-        context.user_data.pop('awaiting_add', None)  # ✅ ОЧИЩАЕМ СОСТОЯНИЕ
-
-    elif context.user_data.get('awaiting_remove'):
-        coin = text.upper()
-        if coin not in bot_data['coins']:
-            await update.message.reply_text(f"❌ Монета {coin} не найдена в списке")
-        else:
-            bot_data['coins'].remove(coin)
-            await update.message.reply_text(f"✅ Удалена монета: {coin}")
-        context.user_data.pop('awaiting_remove', None)  # ✅ ОЧИЩАЕМ СОСТОЯНИЕ
-
 # Функция для команды /ping
 async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ALLOWED_USER_ID:
@@ -318,7 +314,6 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("remove", remove_coin))
     app.add_handler(CommandHandler("coins", list_coins))
     app.add_handler(CommandHandler("settings", settings_menu))
-    app.add_handler(CallbackQueryHandler(button_handler))  # ✅ ОДИН обработчик для всех кнопок
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_input))
+    app.add_handler(CallbackQueryHandler(button_handler))  # ТОЛЬКО ОДИН обработчик кнопок
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_all_messages))  # ОДИН обработчик текста
     app.run_polling()
