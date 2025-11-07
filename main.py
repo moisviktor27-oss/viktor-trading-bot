@@ -266,7 +266,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(message, reply_markup=reply_markup)
 
-# Обработчик нажатий на кнопки "Мои монеты"
+# Обработчик нажатий на inline-кнопки "Мои монеты"
 async def button_handler_coins(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -321,7 +321,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("coins", list_coins))
     app.add_handler(CommandHandler("settings", settings_menu))
     app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(CallbackQueryHandler(button_handler_coins))
+    app.add_handler(CallbackQueryHandler(button_handler_coins))  # ✅ ЭТА СТРОКА ПОДКЛЮЧАЕТ КНОПКИ МОНЕТ
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_input))
     app.run_polling()
