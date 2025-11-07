@@ -59,7 +59,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-    await update.message.reply_text(message, reply_markup=reply_markup)
+    # Отправляем сообщение и запоминаем его ID
+    sent_message = await update.message.reply_text(message, reply_markup=reply_markup)
+    
+    # Сохраняем ID сообщения в user_data
+    context.user_data['dashboard_message_id'] = sent_message.message_id
 
 # Функция для команды /add
 async def add_coin(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -196,6 +200,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(message, reply_markup=reply_markup)
         
     elif text == "🔄 Обновить статус":
+        # Получаем ID старого сообщения
+        old_message_id = context.user_data.get('dashboard_message_id')
+
         # Обновляем данные
         now = datetime.now()
         today = now.strftime("%-d %B %Y, %H:%M:%S")
@@ -226,8 +233,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Отправляем новое сообщение
         new_message = await update.message.reply_text(message, reply_markup=reply_markup)
         
-        # Удаляем старое сообщение (с кнопкой "🔄 Обновить статус")
-        await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=update.message.message_id)
+        # Сохраняем ID нового сообщения
+        context.user_data['dashboard_message_id'] = new_message.message_id
+        
+        # Удаляем старое сообщение (с дашбордом)
+        if old_message_id:
+            try:
+                await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=old_message_id)
+            except:
+                pass  # Игнорируем ошибку, если сообщение не найдено
 
     elif text == "⚙️ Настройки":
         keyboard = [
